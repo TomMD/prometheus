@@ -12,6 +12,7 @@ module System.Metrics.Prometheus.Metric.Gauge
        ) where
 
 import           Control.Applicative ((<$>))
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.IORef          (IORef, atomicModifyIORef', newIORef)
 
 
@@ -19,34 +20,34 @@ newtype Gauge = Gauge { unGauge :: IORef Double }
 newtype GaugeSample = GaugeSample { unGaugeSample :: Double }
 
 
-new :: IO Gauge
-new = Gauge <$> newIORef 0
+new :: MonadIO m => m Gauge
+new = liftIO (Gauge <$> newIORef 0)
 
 
-modifyAndSample :: (Double -> Double) -> Gauge -> IO GaugeSample
-modifyAndSample f = flip atomicModifyIORef' g . unGauge
+modifyAndSample :: MonadIO m => (Double -> Double) -> Gauge -> m GaugeSample
+modifyAndSample f = liftIO . flip atomicModifyIORef' g . unGauge
   where g v = (f v, GaugeSample $ f v)
 
 
-add :: Double -> Gauge -> IO ()
+add :: MonadIO m => Double -> Gauge -> m ()
 add x g = modifyAndSample (+ x) g >> pure ()
 
 
-sub :: Double -> Gauge -> IO ()
+sub :: MonadIO m => Double -> Gauge -> m ()
 sub x g = modifyAndSample (subtract x) g >> pure ()
 
 
-inc :: Gauge -> IO ()
+inc :: MonadIO m => Gauge -> m ()
 inc = add 1
 
 
-dec :: Gauge -> IO ()
+dec :: MonadIO m => Gauge -> m ()
 dec = sub 1
 
 
-set :: Double -> Gauge -> IO ()
+set :: MonadIO m => Double -> Gauge -> m ()
 set x g = modifyAndSample (const x) g >> pure ()
 
 
-sample :: Gauge -> IO GaugeSample
+sample :: MonadIO m => Gauge -> m GaugeSample
 sample = modifyAndSample id

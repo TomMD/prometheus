@@ -14,6 +14,7 @@ module System.Metrics.Prometheus.Metric.Histogram
 
 import           Control.Applicative ((<$>))
 import           Control.Monad       (void)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Bool           (bool)
 import           Data.IORef          (IORef, atomicModifyIORef', newIORef,
                                       readIORef)
@@ -36,16 +37,16 @@ data HistogramSample =
     }
 
 
-new :: [UpperBound] -> IO Histogram
-new buckets = Histogram <$> newIORef empty
+new :: MonadIO m => [UpperBound] -> m Histogram
+new buckets = liftIO (Histogram <$> newIORef empty)
   where
     empty = HistogramSample (Map.fromList $ map (, 0) (read "Infinity" : buckets)) zeroSum zeroCount
     zeroSum = 0.0
     zeroCount = 0
 
 
-observeAndSample :: Double -> Histogram -> IO HistogramSample
-observeAndSample x = flip atomicModifyIORef' update . unHistogram
+observeAndSample :: MonadIO m => Double -> Histogram -> m HistogramSample
+observeAndSample x = liftIO . flip atomicModifyIORef' update . unHistogram
   where
     update histData = (hist' histData, histData)
     hist' histData =
@@ -55,8 +56,8 @@ observeAndSample x = flip atomicModifyIORef' update . unHistogram
                  }
 
 
-observe :: Double -> Histogram -> IO ()
-observe x = void . observeAndSample x
+observe :: MonadIO m => Double -> Histogram -> m ()
+observe x = liftIO . void . observeAndSample x
 
 
 updateBuckets :: Double -> Buckets -> Buckets
@@ -64,5 +65,5 @@ updateBuckets x = Map.mapWithKey updateBucket
   where updateBucket key val = bool val (val + 1) (x <= key)
 
 
-sample :: Histogram -> IO HistogramSample
-sample = readIORef . unHistogram
+sample :: MonadIO m => Histogram -> m HistogramSample
+sample = liftIO . readIORef . unHistogram
